@@ -1,22 +1,27 @@
-const express = require("express")
-const cors = require("cors")
-const { exec } = require("child_process")
+import fs from "fs";
+import { exec } from "child_process";
+import express from "express";
 
-const app = express()
-app.use(cors())
+const app = express();
 
-app.get("/api/video", (req, res) => {
-  const url = req.query.url
-  if (!url) return res.status(400).json({ error: "Missing url param" })
+app.get("/api/video", async (req, res) => {
+  const url = req.query.url;
+  if (!url) return res.status(400).send({ error: "missing url" });
 
-  exec(`yt-dlp -f best --get-url ${url}`, (err, stdout, stderr) => {
+  // Check yt-dlp exists
+  if (!fs.existsSync("./yt-dlp")) {
+    return res.status(500).send({ error: "yt-dlp binary not found" });
+  }
+
+  exec(`./yt-dlp -f best -g "${url}"`, (err, stdout, stderr) => {
     if (err) {
-      console.error(stderr)
-      return res.status(500).json({ error: "yt-dlp failed" })
+      console.error("yt-dlp error:", stderr);
+      return res.status(500).send({ error: "yt-dlp failed", stderr });
     }
-    res.json({ streamUrl: stdout.trim() })
-  })
-})
 
-const PORT = 4000
-app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`))
+    res.send({ streamUrl: stdout.trim() });
+  });
+});
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
